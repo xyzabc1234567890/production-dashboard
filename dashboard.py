@@ -6,7 +6,7 @@ st.set_page_config(page_title="Production Dashboard", layout="wide")
 st.title("🚗 Vehicle Production Dashboard")
 
 # 🔹 Paste your Google Sheet ID here
-sheet_id = "https://docs.google.com/spreadsheets/d/1UCKFxQ67QGck5KrI0y54gp14tbrE6A6ZmXAswdOZfkM/edit?usp=sharing"
+sheet_id = "https://docs.google.com/spreadsheets/d/1IKPz6spdA00Cd_KN9y2cn67z1k54wKgJe7IgrxItzQ8/edit?usp=sharing"
 
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
 
