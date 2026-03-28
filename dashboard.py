@@ -8,7 +8,7 @@ st.title("🚗 Vehicle Production Dashboard")
 # 🔹 Paste your Google Sheet ID here
 sheet_id = "https://docs.google.com/spreadsheets/d/1UCKFxQ67QGck5KrI0y54gp14tbrE6A6ZmXAswdOZfkM/edit?usp=sharing"
 
-url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
 
 # 🔹 Load Data
 try:
