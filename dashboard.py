@@ -5,7 +5,7 @@ st.set_page_config(layout="wide")
 st.title("🚗 Production Dashboard")
 
 # Google Sheet ID
-sheet_id = "1IKPz6spdA00Cd_KN9y2cn67z1k54wKgJe7IgrxItzQ8"
+sheet_id = "https://docs.google.com/spreadsheets/d/1IKPz6spdA00Cd_KN9y2cn67z1k54wKgJe7IgrxItzQ8/edit?usp=sharing"
 
 # Load data
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid=0"
