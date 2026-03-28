@@ -11,7 +11,7 @@ sheet_id = "1IKPz6spdA00Cd_KN9y2cn67z1k54wKgJe7IgrxItzQ8"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid=0"
 
 # ✅ Skip top summary rows
-df = pd.read_csv(url, skiprows=10)
+df = pd.read_csv(url, skiprows=15)
 
 # Clean column names
 df.columns = df.columns.str.strip()
