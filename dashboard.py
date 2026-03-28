@@ -4,17 +4,19 @@ import pandas as pd
 st.set_page_config(layout="wide")
 st.title("🚗 Production Dashboard")
 
-# Google Sheet ID
-sheet_id = "https://docs.google.com/spreadsheets/d/1IKPz6spdA00Cd_KN9y2cn67z1k54wKgJe7IgrxItzQ8/edit?usp=sharing"
+# ✅ ONLY ID (NOT FULL LINK)
+sheet_id = "1IKPz6spdA00Cd_KN9y2cn67z1k54wKgJe7IgrxItzQ8"
 
 # Load data
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid=0"
-df = pd.read_csv(url)
 
-# Clean column names (VERY IMPORTANT)
+# ✅ Skip top summary rows
+df = pd.read_csv(url, skiprows=10)
+
+# Clean column names
 df.columns = df.columns.str.strip()
 
-# Rename for easy use
+# Rename columns
 df.rename(columns={
     "Dropping Date": "Dropping",
     "Roll Out Date": "Rollout",
@@ -27,7 +29,7 @@ df["Dropping"] = pd.to_datetime(df["Dropping"], errors='coerce')
 df["Rollout"] = pd.to_datetime(df["Rollout"], errors='coerce')
 df["PDI"] = pd.to_datetime(df["PDI"], errors='coerce')
 
-# Create count flags
+# Create counts
 df["Drop_Count"] = df["Dropping"].notna().astype(int)
 df["Rollout_Count"] = df["Rollout"].notna().astype(int)
 df["PDI_Count"] = df["PDI"].notna().astype(int)
@@ -65,7 +67,3 @@ trend_df.columns = ["Dropping", "Rollout", "PDI"]
 trend_df = trend_df.fillna(0)
 
 st.line_chart(trend_df)
-
-# ================= RAW DATA (OPTIONAL) =================
-with st.expander("🔍 View Raw Data"):
-    st.dataframe(df)
