@@ -1,69 +1,127 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-st.set_page_config(layout="wide")
+# -----------------------------
+# PAGE CONFIG
+# -----------------------------
+st.set_page_config(page_title="Production Dashboard", layout="wide")
+
 st.title("🚗 Production Dashboard")
+st.markdown("### Plan vs Actual | Dropping | Rollout")
 
-# ✅ ONLY ID (NOT FULL LINK)
-sheet_id = "1IKPz6spdA00Cd_KN9y2cn67z1k54wKgJe7IgrxItzQ8"
+# -----------------------------
+# GOOGLE SHEET LINK
+# -----------------------------
+sheet_url = "https://docs.google.com/spreadsheets/d/191zGMKGDlODL-DTkmSyLIJj8CNQh7S7iUBHe1kDTZK4/export?format=csv"
 
-# Load data
-url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid=0"
+# -----------------------------
+# LOAD DATA
+# -----------------------------
+@st.cache_data
+def load_data():
+    df = pd.read_csv(sheet_url, skiprows=1)
 
-# ✅ Skip top summary rows
-df = pd.read_csv(url, skiprows=15)
+    # Clean column names
+    df.columns = df.columns.str.strip()
 
-# Clean column names
-df.columns = df.columns.str.strip()
+    # Convert dates
+    df["Dropping Date"] = pd.to_datetime(df["Dropping Date"], errors='coerce')
+    df["Rollout Date"] = pd.to_datetime(df["Rollout Date"], errors='coerce')
 
-# Rename columns
-df.rename(columns={
-    "Dropping Date": "Dropping",
-    "Roll Out Date": "Rollout",
-    "Offered to QA": "PDI",
-    "Model": "Model_Name"
-}, inplace=True)
+    return df
 
-# Convert to datetime
-df["Dropping"] = pd.to_datetime(df["Dropping"], errors='coerce')
-df["Rollout"] = pd.to_datetime(df["Rollout"], errors='coerce')
-df["PDI"] = pd.to_datetime(df["PDI"], errors='coerce')
+df = load_data()
 
-# Create counts
-df["Drop_Count"] = df["Dropping"].notna().astype(int)
-df["Rollout_Count"] = df["Rollout"].notna().astype(int)
-df["PDI_Count"] = df["PDI"].notna().astype(int)
+# -----------------------------
+# SIDEBAR FILTER
+# -----------------------------
+st.sidebar.header("Filters")
 
-# ================= KPI =================
-st.subheader("📊 Overall KPIs")
+models = st.sidebar.multiselect(
+    "Select Model",
+    df["Model :"].dropna().unique(),
+    default=df["Model :"].dropna().unique()
+)
+
+df = df[df["Model :"].isin(models)]
+
+# -----------------------------
+# KPI SECTION
+# -----------------------------
+st.subheader("📊 Production Summary")
+
+total_plan = len(df)
+dropping_done = df["Dropping Date"].notna().sum()
+rollout_done = df["Rollout Date"].notna().sum()
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Total Dropping", df["Drop_Count"].sum())
-col2.metric("Total Rollout", df["Rollout_Count"].sum())
-col3.metric("Total PDI Offered", df["PDI_Count"].sum())
 
-# ================= MODEL SUMMARY =================
-st.subheader("📌 Model-wise Production Summary")
+col1.metric("📦 Total Plan", total_plan)
+col2.metric("⬇ Dropping Done", dropping_done)
+col3.metric("🚚 Rolled Out", rollout_done)
 
-model_summary = df.groupby("Model_Name").agg({
-    "Drop_Count": "sum",
-    "Rollout_Count": "sum",
-    "PDI_Count": "sum"
+# -----------------------------
+# DAILY TREND
+# -----------------------------
+st.subheader("📈 Daily Trend")
+
+drop = df.groupby("Dropping Date").size().reset_index(name="Dropping")
+roll = df.groupby("Rollout Date").size().reset_index(name="Rollout")
+
+trend = pd.merge(drop, roll,
+                 left_on="Dropping Date",
+                 right_on="Rollout Date",
+                 how="outer").fillna(0)
+
+trend["Date"] = trend["Dropping Date"].combine_first(trend["Rollout Date"])
+
+fig = px.line(trend, x="Date", y=["Dropping", "Rollout"],
+              markers=True)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -----------------------------
+# MODEL-WISE ANALYSIS
+# -----------------------------
+st.subheader("📊 Model-wise Plan vs Actual")
+
+model_summary = df.groupby("Model :").agg({
+    "Chassis No:": "count",
+    "Dropping Date": lambda x: x.notna().sum(),
+    "Rollout Date": lambda x: x.notna().sum()
 }).reset_index()
 
-model_summary.columns = ["Model", "Dropping", "Rollout", "PDI"]
+model_summary.columns = ["Model", "Plan", "Dropping", "Rollout"]
 
-st.dataframe(model_summary, use_container_width=True)
+fig2 = px.bar(model_summary,
+              x="Model",
+              y=["Plan", "Dropping", "Rollout"],
+              barmode="group",
+              text_auto=True)
 
-# ================= DAILY TREND =================
-st.subheader("📈 Daily Production Trend")
+st.plotly_chart(fig2, use_container_width=True)
 
-drop_trend = df.groupby("Dropping")["Drop_Count"].sum()
-rollout_trend = df.groupby("Rollout")["Rollout_Count"].sum()
-pdi_trend = df.groupby("PDI")["PDI_Count"].sum()
+# -----------------------------
+# STATUS COLUMN (ADVANCED)
+# -----------------------------
+st.subheader("📌 Status Overview")
 
-trend_df = pd.concat([drop_trend, rollout_trend, pdi_trend], axis=1)
-trend_df.columns = ["Dropping", "Rollout", "PDI"]
-trend_df = trend_df.fillna(0)
+df["Status"] = df.apply(
+    lambda x: "Rolled Out" if pd.notna(x["Rollout Date"])
+    else ("Dropped" if pd.notna(x["Dropping Date"]) else "Pending"),
+    axis=1
+)
 
-st.line_chart(trend_df)
+status_count = df["Status"].value_counts().reset_index()
+status_count.columns = ["Status", "Count"]
+
+fig3 = px.pie(status_count, names="Status", values="Count")
+
+st.plotly_chart(fig3, use_container_width=True)
+
+# -----------------------------
+# DATA TABLE
+# -----------------------------
+st.subheader("📋 Data Table")
+st.dataframe(df, use_container_width=True)
