@@ -42,7 +42,7 @@ df[roll_col] = pd.to_datetime(df[roll_col], errors='coerce')
 # -----------------------------
 # SIDEBAR FILTER
 # -----------------------------
-st.sidebar.header("🔍 Filters")
+st.sidebar.header("🔍 MENU")
 
 models = st.sidebar.multiselect(
     "Select Model",
