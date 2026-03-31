@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
 # -----------------------------
 # PAGE CONFIG
@@ -23,102 +22,96 @@ def load_data():
     df = pd.read_csv(sheet_url, skiprows=1)
 
     # Clean column names
-    df.columns = df.columns.str.strip()
-
-    # Convert dates
-    df["Dropping Date"] = pd.to_datetime(df["Dropping Date"], errors='coerce')
-    df["Rollout Date"] = pd.to_datetime(df["Rollout Date"], errors='coerce')
+    df.columns = df.columns.str.strip().str.replace(":", "")
 
     return df
 
 df = load_data()
 
 # -----------------------------
+# AUTO DETECT COLUMNS
+# -----------------------------
+model_col = [c for c in df.columns if "Model" in c][0]
+drop_col = [c for c in df.columns if "Dropping" in c][0]
+roll_col = [c for c in df.columns if "Rollout" in c][0]
+
+# Convert to datetime
+df[drop_col] = pd.to_datetime(df[drop_col], errors='coerce')
+df[roll_col] = pd.to_datetime(df[roll_col], errors='coerce')
+
+# -----------------------------
 # SIDEBAR FILTER
 # -----------------------------
-st.sidebar.header("Filters")
+st.sidebar.header("🔍 Filters")
 
 models = st.sidebar.multiselect(
     "Select Model",
-    df["Model :"].dropna().unique(),
-    default=df["Model :"].dropna().unique()
+    df[model_col].dropna().unique(),
+    default=df[model_col].dropna().unique()
 )
 
-df = df[df["Model :"].isin(models)]
+df = df[df[model_col].isin(models)]
 
 # -----------------------------
 # KPI SECTION
 # -----------------------------
 st.subheader("📊 Production Summary")
 
-total_plan = len(df)
-dropping_done = df["Dropping Date"].notna().sum()
-rollout_done = df["Rollout Date"].notna().sum()
+total = len(df)
+dropping_done = df[drop_col].notna().sum()
+rollout_done = df[roll_col].notna().sum()
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric("📦 Total Plan", total_plan)
+col1.metric("📦 Total Plan", total)
 col2.metric("⬇ Dropping Done", dropping_done)
 col3.metric("🚚 Rolled Out", rollout_done)
 
 # -----------------------------
-# DAILY TREND
+# DAILY TREND (NO PLOTLY)
 # -----------------------------
 st.subheader("📈 Daily Trend")
 
-drop = df.groupby("Dropping Date").size().reset_index(name="Dropping")
-roll = df.groupby("Rollout Date").size().reset_index(name="Rollout")
+drop = df.groupby(drop_col).size()
+roll = df.groupby(roll_col).size()
 
-trend = pd.merge(drop, roll,
-                 left_on="Dropping Date",
-                 right_on="Rollout Date",
-                 how="outer").fillna(0)
+trend = pd.concat([drop, roll], axis=1)
+trend.columns = ["Dropping", "Rollout"]
+trend = trend.fillna(0)
 
-trend["Date"] = trend["Dropping Date"].combine_first(trend["Rollout Date"])
-
-fig = px.line(trend, x="Date", y=["Dropping", "Rollout"],
-              markers=True)
-
-st.plotly_chart(fig, use_container_width=True)
+st.line_chart(trend)
 
 # -----------------------------
 # MODEL-WISE ANALYSIS
 # -----------------------------
 st.subheader("📊 Model-wise Plan vs Actual")
 
-model_summary = df.groupby("Model :").agg({
-    "Chassis No:": "count",
-    "Dropping Date": lambda x: x.notna().sum(),
-    "Rollout Date": lambda x: x.notna().sum()
-}).reset_index()
+summary = df.groupby(model_col).agg({
+    model_col: "count",
+    drop_col: lambda x: x.notna().sum(),
+    roll_col: lambda x: x.notna().sum()
+}).rename(columns={
+    model_col: "Plan",
+    drop_col: "Dropping",
+    roll_col: "Rollout"
+})
 
-model_summary.columns = ["Model", "Plan", "Dropping", "Rollout"]
-
-fig2 = px.bar(model_summary,
-              x="Model",
-              y=["Plan", "Dropping", "Rollout"],
-              barmode="group",
-              text_auto=True)
-
-st.plotly_chart(fig2, use_container_width=True)
+st.bar_chart(summary)
 
 # -----------------------------
-# STATUS COLUMN (ADVANCED)
+# STATUS TRACKING
 # -----------------------------
 st.subheader("📌 Status Overview")
 
 df["Status"] = df.apply(
-    lambda x: "Rolled Out" if pd.notna(x["Rollout Date"])
-    else ("Dropped" if pd.notna(x["Dropping Date"]) else "Pending"),
+    lambda x: "Rolled Out" if pd.notna(x[roll_col])
+    else ("Dropped" if pd.notna(x[drop_col]) else "Pending"),
     axis=1
 )
 
-status_count = df["Status"].value_counts().reset_index()
-status_count.columns = ["Status", "Count"]
+status = df["Status"].value_counts()
 
-fig3 = px.pie(status_count, names="Status", values="Count")
-
-st.plotly_chart(fig3, use_container_width=True)
+st.bar_chart(status)
 
 # -----------------------------
 # DATA TABLE
